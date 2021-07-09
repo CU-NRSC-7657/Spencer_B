@@ -3,12 +3,12 @@
 % kinematic data for each reach from every mouse in your curator folder,
 % organized by mouse name.
 
-function master_list=reach_extract(Curator_folder_path, Synology_pose_tracking_path)
+function theBIGdf=reach_extract(Curator_folder_path, Synology_pose_tracking_path)
 
 % MAKE THIS A CATCH TO SEE IF THE REQUIRED FUNCTIONS ARE INSTALLED
 if exist('interparc')==0 || exist('arclength')==0
     sprintf('You are missing functions! Please install interparc and arclength from the Add-on installer');
-    break
+    return
 end
 
 % Adds the path of the two folders needed for kinematics
@@ -17,32 +17,30 @@ addpath(Curator_folder_path, Synology_pose_tracking_path);
 Curator_dir=struct2table(dir(Curator_folder_path));
 Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
 % Creates a table with space to add each training session
+% CHECK IF THIS CAN BE REPLACED (ALSO AT END OF FUNCTION)
 Full_list=table(Curator_list,cell(size(Curator_list,1),1),'VariableNames', {'mouseName', 'sessions'});
 
-
+tic
+it=0
 theBIGdf=table.empty;
 % iterate through each mouse in list
 for i=1:height(Full_list)
     % get list of CSV files
     Mouse_dir=struct2table(dir(fullfile(char(Curator_folder_path),Full_list.mouseName{i})));
     Session_dir=Mouse_dir.name(endsWith(Mouse_dir.name,'.xlsx')==1);
-    % Allocate the mouse table
-    Session_list=table('Size', [size(Session_dir,1) 5], 'VariableTypes', {'string','string','double', 'double', 'table'},...
-        'VariableNames', {'filename', 'date', 'day', 'performance', 'dayReaches'});
-    tempRow=cell(1,5); % used in row BLANK
-    
+        
     % iterate through each session for a mouse
     for k=1:size(Session_dir,1)
         % Read in the curator CSV
         sessionReaches=readtable(fullfile(Curator_folder_path, Full_list.mouseName{i}, Session_dir{k}));
         % allocate new columns (IS THERE A CLEANER WAY TO DO THIS?)
-        sessionReaches=[sessionReaches, (cell2table(cell(height(sessionReaches),10), 'VariableNames',...
+        sessionReaches=[sessionReaches, (cell2table(cell(height(sessionReaches),13), 'VariableNames',...
             {'handX','handY','handZ','handSideConf','handFrontConf',...
-            'pelletX','pelletY','pelletZ','pelletSideConf','pelletFrontConf',}))];
+            'pelletX','pelletY','pelletZ','pelletSideConf','pelletFrontConf',...
+            'velRaw', 'velInt', 'velAbs'}))];
         
         % Read the session pose tracking data
         load(fullfile(Synology_pose_tracking_path, [Session_dir{k}(1:26) '_3D.mat']));
-        table3D{1,1:10}{:,:}=double(table3D{1,1:10}{:,:});
         % matlab functions don't like unit16 data so this changes it to
         % double
         for g=1:10
@@ -65,20 +63,38 @@ for i=1:height(Full_list)
             sessionReaches.pelletSideConf{m}=table3D.pelletConfXY_10k{1,1}(sessionReaches{m,1}:sessionReaches{m,a})';
             sessionReaches.pelletFrontConf{m}=table3D.pelletConfZ_10k{1,1}(sessionReaches{m,1}:sessionReaches{m,a})';
         end   
-        % Add velocity up here instead of lower?
+        % This adds velocity data
+        for m=1:height(sessionReaches)
+            tempeuc=[sessionReaches.handX{m} sessionReaches.handY{m} sessionReaches.handZ{m}];
+            absvel=[];
+            velint=[];
+            for o=1:size(tempeuc,1)-1
+                absvel(o,1)=norm(tempeuc(o+1,:)-tempeuc(o,:));
+                velint(o,:)=tempeuc(o+1,:)-tempeuc(o,:);
+            end
+            velint(:,2)=velint(:,2)*-1;
+            sessionReaches.velRaw{m}=velint;
+
+            li=1:size(velint,1);
+            temp=(length(li)-1)/99;
+            lf=1:temp:length(li);
+
+            sessionReaches.velInt{m}=interp1(li,velint,lf,'pchip');
+            sessionReaches.velAbs{m}=interp1(li,absvel,lf,'pchip')';
+        end
+        
         
         
         % add interps and DTW next THIS COULD BE AN OPTION IN THE FUNCTION
-        sessionReaches=[sessionReaches, (cell2table(cell(height(sessionReaches),12), 'VariableNames',...
+        sessionReaches=[sessionReaches, (cell2table(cell(height(sessionReaches),9), 'VariableNames',...
             {'intHandX','intHandY','intHandZ','intHandEuc',...
-            'DTWHandX','DTWHandY','DTWHandZ','DTWHandEuc','handArcLength',...
-            'velRaw', 'velInt', 'velAbs'}))];
+            'DTWHandX','DTWHandY','DTWHandZ','DTWHandEuc','handArcLength'}))];
 
         sessionReaches.intHandX=cellfun(@(x)smoothdata(x, 'movmedian',3), sessionReaches.handX, 'UniformOutput',false);
         sessionReaches.intHandY=cellfun(@(x)smoothdata(x, 'movmedian',3), sessionReaches.handY, 'UniformOutput',false);
         sessionReaches.intHandZ=cellfun(@(x)smoothdata(x, 'movmedian',5), sessionReaches.handZ, 'UniformOutput',false);
         
-        sessionReaches(:,21:23)=[sessionReaches.intHandX, sessionReaches.intHandY, sessionReaches.intHandZ]; 
+        sessionReaches(:,24:26)=[sessionReaches.intHandX, sessionReaches.intHandY, sessionReaches.intHandZ]; 
         
         for m=1:height(sessionReaches)                
             li=1:length(sessionReaches.handX{m});
@@ -90,6 +106,8 @@ for i=1:height(Full_list)
 
             sessionReaches.intHandEuc{m}=[sessionReaches.intHandX{m} sessionReaches.intHandY{m} sessionReaches.intHandZ{m}];
         end
+        
+        
         
         for m=1:height(sessionReaches)
             % This try loop exists because the warping function does
@@ -139,38 +157,26 @@ for i=1:height(Full_list)
             sessionReaches.DTWHandNorm{m}=sessionReaches.DTWHandEuc{m}-median(temp);
         end
 
-        % This adds velocity data
-        for m=1:height(sessionReaches)
-            tempeuc=[sessionReaches.handX{m} sessionReaches.handY{m} sessionReaches.handZ{m}];
-            for o=1:size(tempeuc,1)-1
-                absvel(o,1)=norm(tempeuc(o+1,:)-tempeuc(o,:));
-                velint(o,:)=tempeuc(o+1,:)-tempeuc(o,:);
-            end
-            velint(:,2)=velint(:,2)*-1;
-            sessionReaches.velRaw{m}=velint;
-
-            li=1:size(velint,1);
-            temp=(length(li)-1)/99;
-            lf=1:temp:length(li);
-
-            sessionReaches.velInt{m}=interp1(li,velint,lf,'pchip');
-            sessionReaches.velAbs{m}=interp1(li,absvel,lf,'pchip')';
-        end
         
         
         % pull any uneeded columns, Is it worth making  this an option in
         % the funciton?
-        reaches=removevars(reaches,{'intHandX', 'intHandY', 'intHandZ', 'DTWHandX', 'DTWHandY', 'DTWHandZ'});
+        sessionReaches=removevars(sessionReaches,{'intHandX', 'intHandY', 'intHandZ', 'DTWHandX', 'DTWHandY', 'DTWHandZ'});
         
+        % adds session level data to the dataframe
+        Session_data=table('Size', [height(sessionReaches) 5], 'VariableTypes', {'string','string','string','double', 'double'},...
+         'VariableNames', {'MouseID','filename', 'date', 'day', 'performance'});    
+        tempRow={Full_list.mouseName{i}, Session_dir{k}(1:26), Session_dir{k}(1:8), k,...
+            (sum(strcmp(sessionReaches.behaviors,'success'))/height(sessionReaches))*100};
         
-        % change this to add to the front of the sessionReaches table
-        tempRow={Session_dir{k}(1:26), Session_dir{k}(1:8), k,...
-            (sum(strcmp(sessionReaches.behaviors,'success'))/height(sessionReaches))*100, sessionReaches};
-        Session_list(k,:)=tempRow;        
-
+        tempRow=repmat(tempRow, height(sessionReaches),1);
+        Session_data(:,:)=tempRow;  
+        sessionReaches=[Session_data sessionReaches];
+        it=it+1
+        theBIGdf=[theBIGdf; sessionReaches];
     
     end
-
     
-    
+end
+toc    
 end
