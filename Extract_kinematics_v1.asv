@@ -3,7 +3,7 @@
 % kinematic data for each reach from every mouse in your curator folder,
 % organized by mouse name.
 
-function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path)
+function [theBIGdf]=reach_extract(Curator_folder_path, Synology_pose_tracking_path)
 
 % MAKE THIS A CATCH TO SEE IF THE REQUIRED FUNCTIONS ARE INSTALLED
 if exist('interparc')==0 || exist('arclength')==0

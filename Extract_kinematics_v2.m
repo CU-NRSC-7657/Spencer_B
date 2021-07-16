@@ -3,26 +3,65 @@
 % kinematic data for each reach from every mouse in your curator folder,
 % organized by mouse name.
 
-function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path)
+function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path, varargin)
 
-% MAKE THIS A CATCH TO SEE IF THE REQUIRED FUNCTIONS ARE INSTALLED
+arguments
+    Curator_folder_path string
+    Synology_pose_tracking_path string
+end
+
+% Check for dependent functions
 if exist('interparc')==0 || exist('arclength')==0
-    sprintf('You are missing functions! Please install interparc and arclength from the Add-on installer');
+    sprintf('You are missing functions! Please install interparc and arclength by John D Errico from the Add-on installer');
     return
+end
+
+% HOW DO YOU ASSIGN VARAGINS?
+if size(varagin,1)==1
+    if istable(varagin(1))==1
+        oldBIGdf=varargin{1};
+        % RUN OPTION 2
+    elseif iscell(varagin(1))==1
+        justTheseMice=varargin{1};
+        % RUN OPTION 3
+    else
+        sprintf('Your inputs are not correctly formatted')
+        return
+    end
+elseif size(varagin,1)==2
+    oldBIGdf=varargin{1};
+    justTheseMice=varargin{2};
+    % RUN OPTION 2 & 3
+elseif size(varagin,1)>2
+    sprintf('Too many input arguments')
+    return
+else
+    % RUN DEFAULT OPTION
 end
 
 % Adds the path of the two folders needed for kinematics
 addpath(Curator_folder_path, Synology_pose_tracking_path);
-% Creates a list of all curated mice in foloder
+
+% Creates a list of all curated mice in foloder THIS NEEDS TO BE ONE OF
+% THREE OPTIONS DEPENDING ON VARAGINS ENTERED
+% OPTION 1 DEFAULT
 Curator_dir=struct2table(dir(Curator_folder_path));
 Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
-% Creates a table with space to add each training session
-% CHECK IF THIS CAN BE REPLACED (ALSO AT END OF FUNCTION)
-Full_list=table(Curator_list,cell(size(Curator_list,1),1),'VariableNames', {'mouseName', 'sessions'});
+Full_list=table(Curator_list,'VariableNames', {'mouseName'});
+
+% OPTION 2
+% Add options to use a separate list or append an existing dataframe
+newMice=setdiff(Curatory_list,unique(theBIGdf.MouseID));
+Full_list=table(newMice,'VariableNames', {'mouseName'});
+
+% OPTION 3
+Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
 
 tic
 it=0
 theBIGdf=table.empty;
+
+% DEFAULT OPTION (AND OPTION 3 ALONE)
 % iterate through each mouse in list
 for i=1:height(Full_list)
     % get list of CSV files
@@ -178,5 +217,11 @@ for i=1:height(Full_list)
     end
     
 end
-toc    
+toc  
+
+% FOR APPENDING OPTION 2 OR 3
+theBIGdf=[oldBIGdf; theBIGdf];
+
+
+
 end

@@ -3,26 +3,62 @@
 % kinematic data for each reach from every mouse in your curator folder,
 % organized by mouse name.
 
-function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path)
+function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path, varargin)
 
-% MAKE THIS A CATCH TO SEE IF THE REQUIRED FUNCTIONS ARE INSTALLED
+arguments
+    Curator_folder_path string
+    Synology_pose_tracking_path string
+end
+
+% Check for dependent functions
 if exist('interparc')==0 || exist('arclength')==0
-    sprintf('You are missing functions! Please install interparc and arclength from the Add-on installer');
+    sprintf('You are missing functions! Please install interparc and arclength by John D Errico from the Add-on installer');
     return
+end
+
+% boolian for appending
+appendMe=false;
+% HOW DO YOU ASSIGN VARAGINS?
+
+if size(varagin,1)==1
+    if istable(varagin(1))==1
+        % APPEND ALL NEW MICE TO OLD LIST
+        oldBIGdf=varargin{1};
+        newMice=setdiff(Curatory_list,unique(oldBIGdf.MouseID));
+        Full_list=table(newMice,'VariableNames', {'mouseName'});
+        appendMe=true;
+    elseif iscell(varagin(1))==1
+        % RUN ON A LIST OF MICE
+        justTheseMice=varargin{1};
+        Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
+    else
+        sprintf('Your inputs are not correctly formatted')
+        return
+    end
+elseif size(varagin,1)==2
+    % APPEND A LIST OF MICE TO OLD LIST
+    oldBIGdf=varargin{1};
+    justTheseMice=varargin{2};
+    Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
+    appendMe=true;
+elseif size(varagin,1)>2
+    sprintf('Too many input arguments')
+    return
+else
+    % DEFAULT RUN ON ALL MICE IN FOLDER
+    Curator_dir=struct2table(dir(Curator_folder_path));
+    Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
+    Full_list=table(Curator_list,'VariableNames', {'mouseName'});
 end
 
 % Adds the path of the two folders needed for kinematics
 addpath(Curator_folder_path, Synology_pose_tracking_path);
-% Creates a list of all curated mice in foloder
-Curator_dir=struct2table(dir(Curator_folder_path));
-Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
-% Creates a table with space to add each training session
-% CHECK IF THIS CAN BE REPLACED (ALSO AT END OF FUNCTION)
-Full_list=table(Curator_list,cell(size(Curator_list,1),1),'VariableNames', {'mouseName', 'sessions'});
 
-tic
+
+
 it=0
 theBIGdf=table.empty;
+
 % iterate through each mouse in list
 for i=1:height(Full_list)
     % get list of CSV files
@@ -178,5 +214,10 @@ for i=1:height(Full_list)
     end
     
 end
-toc    
+
+% FOR APPENDING
+if apendMe==true;
+    theBIGdf=[oldBIGdf; theBIGdf];
+end
+
 end
