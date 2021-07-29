@@ -3,20 +3,26 @@
 % kinematic data for each reach from every mouse in your curator folder,
 % organized by mouse ID.
 
-function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path, varargins)
+function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path, varargin)
 
 
 % Check for dependent functions
 if exist('interparc')==0 || exist('arclength')==0
-    sprintf('You are missing functions! Please install interparc and arclength by John D Errico from the Add-on installer');
+    sprintf('You are missing functions! Please install ''interparc'' and ''arclength'' by John D Errico from the Add-on installer');
+    return
+end
+
+if contains(Curator_folder_path,['\','/'])==0 || contains(Synology_pose_tracking_path,['\','/'])==0
+    sprintf('Your inputs are not correctly formatted, they should be Chars or Strings')
     return
 end
 
 % boolian for appending
 appendMe=false;
-% HOW DO YOU ASSIGN VARAGINS?
-
-x=size(varargin,1);
+% CHANGE VARARGIN TO {} INSTEAD OF ()
+Curator_dir=struct2table(dir(Curator_folder_path));
+Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
+x=size(varargin,2);
 switch x
     case 0
         Curator_dir=struct2table(dir(Curator_folder_path));
@@ -24,83 +30,51 @@ switch x
         Full_list=table(Curator_list,'VariableNames', {'mouseName'});
     
     case 1
-        if istable(varagin(1))==1
+        if istable(varargin{1})==1
             % APPEND ALL NEW MICE TO OLD LIST
             oldBIGdf=varargin{1};
-            newMice=setdiff(Curatory_list,unique(oldBIGdf.MouseID));
+            newMice=setdiff(Curator_list,unique(oldBIGdf.MouseID));
             Full_list=table(newMice,'VariableNames', {'mouseName'});
             appendMe=true;
-        elseif iscell(varagin(1))==1
+        elseif iscell(varargin{1})==1
             % RUN ON A LIST OF MICE
             justTheseMice=varargin{1};
             Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
         else
-            sprintf('Your inputs are not correctly formatted')
+            sprintf('Your optional input is not correctly formatted, it should be a table or a cell')
             return
         end
     case 2
         what_am_i=cellfun(@class, varargin, 'UniformOutput',false)';
-        switch [what_am_i{1} '/' what_am_i{1}]
+        switch [what_am_i{1} '/' what_am_i{2}]
             case 'cell/table'
-                sprintf('yeah')
+                % APPEND A LIST OF MICE TO OLD LIST
+                oldBIGdf=varargin{2};
+                justTheseMice=varargin{1};
+                Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
+                appendMe=true;
             case 'table/cell'
-                sprintf('no')
+                % APPEND A LIST OF MICE TO OLD LIST
+                oldBIGdf=varargin{1};
+                justTheseMice=varargin{2};
+                Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
+                appendMe=true;
             otherwise
-                sprintf('Your inputs are not correctly formatted')
+                sprintf('Your optional inputs are not correctly formatted, they should be a table and a cell')
                 return
         end
-        if ismember(what_am_i{1,1},['cell','table'])==0 || ismember(what_am_i{2,1},['cell','table'])==0
-            sprintf('Your inputs are not correctly formatted')
-            return
-        elseif class(varagin(1,1))==class(varagin(2,1))
-            sprintf('Your inputs are not correctly formatted')
-            return
-        elseif
-            
-        end
-        
     otherwise
         sprintf('Too many input arguments')
         return
 end
 
-if size(varargin,1)==1
-    if istable(varagin(1))==1
-        % APPEND ALL NEW MICE TO OLD LIST
-        oldBIGdf=varargin{1};
-        newMice=setdiff(Curatory_list,unique(oldBIGdf.MouseID));
-        Full_list=table(newMice,'VariableNames', {'mouseName'});
-        appendMe=true;
-    elseif iscell(varagin(1))==1
-        % RUN ON A LIST OF MICE
-        justTheseMice=varargin{1};
-        Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
-    else
-        sprintf('Your inputs are not correctly formatted')
-        return
-    end
-elseif size(varargin,1)==2
-    % APPEND A LIST OF MICE TO OLD LIST
-    oldBIGdf=varargin{1};
-    justTheseMice=varargin{2};
-    Full_list=table(justTheseMice,'VariableNames', {'mouseName'});
-    appendMe=true;
-elseif size(varargin,1)>2
-    sprintf('Too many input arguments')
-    return
-else
-    % DEFAULT RUN ON ALL MICE IN FOLDER
-    Curator_dir=struct2table(dir(Curator_folder_path));
-    Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
-    Full_list=table(Curator_list,'VariableNames', {'mouseName'});
-end
 
 % Adds the path of the two folders needed for kinematics
 addpath(Curator_folder_path, Synology_pose_tracking_path);
 
-
-
-it=0
+class(varargin{1})
+x
+it=0;
 theBIGdf=table.empty;
 
 % iterate through each mouse in list
@@ -260,7 +234,7 @@ for i=1:height(Full_list)
 end
 
 % FOR APPENDING
-if apendMe==true
+if appendMe==true
     theBIGdf=[oldBIGdf; theBIGdf];
 end
 
