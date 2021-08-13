@@ -1,9 +1,11 @@
 %% Extract Kinematics
 % This function creates a data structure (best format TBD) that has
 % kinematic data for each reach from every mouse in your curator folder,
-% organized by mouse ID.
+% organized by mouse ID.d
 
-function [theBIGdf]=Extract_kinematics_v1(Curator_folder_path, Synology_pose_tracking_path, varargin)
+% remember to chose reachMax a=(2) or reachEnd a=(3) on line
+
+function [theBIGdf]=Extract_kinematics_v4(Curator_folder_path, Synology_pose_tracking_path, varargin)
 
 
 % Check for dependent functions
@@ -12,14 +14,17 @@ if exist('interparc')==0 || exist('arclength')==0
     return
 end
 
-if contains(Curator_folder_path,['\','/'])==0 || contains(Synology_pose_tracking_path,['\','/'])==0
+if contains(Curator_folder_path,["\","/"])==0 || contains(Synology_pose_tracking_path,["\","/"])==0
     sprintf('Your inputs are not correctly formatted, they should be Chars or Strings')
     return
 end
 
 % boolian for appending
 appendMe=false;
-% CHANGE VARARGIN TO {} INSTEAD OF ()
+
+% reachMax or reachEnd
+a=3;
+
 Curator_dir=struct2table(dir(Curator_folder_path));
 Curator_list=Curator_dir.name(Curator_dir.isdir==1 & ismember(Curator_dir.name, {'.', '..'})==0 );
 x=size(varargin,2);
@@ -72,7 +77,7 @@ end
 % Adds the path of the two folders needed for kinematics
 addpath(Curator_folder_path, Synology_pose_tracking_path);
 
-class(varargin{1})
+
 x
 it=0;
 theBIGdf=table.empty;
@@ -103,7 +108,6 @@ for i=1:height(Full_list)
             
         % iterate through each reach in a session
         % OPTIONAL: MAKE THE FUNCTION GO TO EITHER REACHMAX OR REACHEND
-        a=2;
         for m=1:height(sessionReaches)
             sessionReaches.handX{m}=table3D.handX_100{1,1}(sessionReaches{m,1}:sessionReaches{m,a})';
             sessionReaches.handY{m}=table3D.handY_100{1,1}(sessionReaches{m,1}:sessionReaches{m,a})';
